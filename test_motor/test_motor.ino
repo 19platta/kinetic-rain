@@ -30,7 +30,7 @@ void setup() {
   Serial.println("Adafruit Motorshield v2 - DC Motor test!");
 
 
-  for (int i = 0; i <= numMotors; i++) {
+  for (int i = 0; i < numMotors; i++) {
     motors[i] = AFMS.getMotor(i + 1);
   }
 
@@ -46,20 +46,21 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available() > 2) { 
+
+  if (Serial.available() > 0) { 
     for (int i = 0; i < numMotors; i++){
 
 
-      Serial.readBytes(buff, bufferLength);
-      buff[bufferLength] = '\0';
+      int numBytes = Serial.readBytesUntil(',', buff, bufferLength + 1);
+      buff[numBytes] = '\0';
       int motorSpeed = atoi(buff);
  
-      Serial.print(motorSpeed);
+      Serial.println(motorSpeed);
+      //Serial.println(buff);
       motors[i]->run(FORWARD);
       motors[i]->setSpeed(motorSpeed);
 
     }
-
     
   }
 }
