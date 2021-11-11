@@ -1,11 +1,3 @@
-/*
-This is a test sketch for the Adafruit assembled Motor Shield for Arduino v2
-It won't work with v1.x motor shields! Only for the v2's with built in PWM
-control
-For use with the Adafruit Motor Shield v2
----->  http://www.adafruit.com/products/1438
-*/
-
 #include <Adafruit_MotorShield.h>
 
 typedef struct {
@@ -22,13 +14,23 @@ typedef struct {
 	Button *button;
 } Axle;
 
+
+// Specify number of shields with numShields
+// Specify shield address with shieldPins
+const int numShields = 1;
+const uint8_t shieldPins[numShields] = {0x60};
+
+// Specify number of motors on each shield with numMotors
+// Specify motor pin and button pins with motorPins and buttonPins
+// motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
+const uint8_t numMotors[numShields] = {1};
+const uint8_t motorPins[numShields][4] = {{1,}};
+const uint8_t buttonPins[numShields][4] = {{0,}};
+
+// Should be `sum(numMotors)`
 const int numAxles = 1;
 Axle *axles[numAxles];
 
-Adafruit_MotorShield AFMS = Adafruit_MotorShield();
-const uint8_t motorPins[numAxles] = {1};
-
-const uint8_t buttonPins[numAxles] = {0};
 const unsigned long debounceDelay = 50;
 
 const int numCharsPerMotor = 5;
@@ -37,35 +39,41 @@ char receivedChars[numChars];
 boolean newData = false;
 
 
-void setupAxles() {
-  for (int i = 0; i < numAxles; i++) {
-		pinMode(buttonPins[i], INPUT);
-		Button button = {
-			.pin = buttonPins[i],
-			.lastDebounceTime = 0,
-			.lastReading = LOW,
-			.state = LOW,
-		};
-		Axle axle = {
-			.motor = AFMS.getMotor(motorPins[i]),
-			.lastSpeed = 0,
-			.angle = 0,
-			.button = &button,
-		};
-    axles[i] = &axle;
-  }
-}
-
-
 void setup() {
   Serial.begin(9600);
 
-  if (!AFMS.begin()) {
-    Serial.println("Could not find Motor Shield. Check wiring.");
-    while (1);
-  }
+	int axleIdx = 0;
+  for (int i = 0; i < numShields; i++) {
+		Adafruit_MotorShield AFMS = Adafruit_MotorShield(shieldPins[i]);
+		if (!AFMS.begin()) {
+			Serial.print("Could not find Motor Shield ");
+			Serial.println(i);
+			while (1);
+		}
 
-	setupAxles();
+		for (int j = 0; j < numMotors[i]; j++) {
+			pinMode(buttonPins[i][j], INPUT);
+			Button button = {
+				.pin = buttonPins[i][j],
+				.lastDebounceTime = 0,
+				.lastReading = LOW,
+				.state = LOW,
+			};
+			Axle axle = {
+				.motor = AFMS.getMotor(motorPins[i][j]),
+				.lastSpeed = 0,
+				.angle = 0,
+				.button = &button,
+			};
+			axles[axleIdx++] = &axle;
+		}
+	}
+
+	if (axleIdx != numAxles) {
+		Serial.print("Only "); Serial.print(axleIdx);
+		Serial.println(" axles setup. Ensure numMotors is set properly.");
+		while (1);
+	}
 
   Serial.println("Setup Done");
 }
@@ -111,7 +119,7 @@ void recvWithStartEndMarkers() {
 int readButton(Button *button) {
 	/* Debounces the button.
    *
-	 * Only updates the button state when the reading has * been consistent for
+	 * Only updates the button state when the reading has been consistent for
 	 * at least debounceDelay milliseconds.
 	 */
 	int reading = digitalRead(button->pin);
