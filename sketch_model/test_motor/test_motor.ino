@@ -22,31 +22,32 @@ typedef struct {
 	Button *button;
 } Axle;
 
-const int numMotors = 1;
-Axle *axles [numMotors];
-Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+const int numAxles = 1;
+Axle *axles[numAxles];
 
-const uint8_t buttonOffset = 0;
+Adafruit_MotorShield AFMS = Adafruit_MotorShield();
+const uint8_t motorPins[numAxles] = {1};
+
+const uint8_t buttonPins[numAxles] = {0};
 const unsigned long debounceDelay = 50;
 
 const int numCharsPerMotor = 5;
-const byte numChars = numMotors * numCharsPerMotor;
+const byte numChars = numAxles * numCharsPerMotor;
 char receivedChars[numChars];
 boolean newData = false;
 
 
 void setupAxles() {
-  for (int i = 0; i < numMotors; i++) {
-		uint8_t pin = i + buttonOffset;
-		pinMode(pin, INPUT);
+  for (int i = 0; i < numAxles; i++) {
+		pinMode(buttonPins[i], INPUT);
 		Button button = {
-			.pin = pin,
+			.pin = buttonPins[i],
 			.lastDebounceTime = 0,
 			.lastReading = LOW,
 			.state = LOW,
 		};
 		Axle axle = {
-			.motor = AFMS.getMotor(i + 1),
+			.motor = AFMS.getMotor(motorPins[i]),
 			.lastSpeed = 0,
 			.angle = 0,
 			.button = &button,
@@ -126,7 +127,7 @@ int readButton(Button *button) {
 
 
 void parseNewData() {
-  for (int i = 0; i < numMotors; i++){
+  for (int i = 0; i < numAxles; i++){
     char * token = strtok(i == 0 ? receivedChars : NULL, ",");
     int motorSpeed = atoi(token);
 		int direction = FORWARD;
