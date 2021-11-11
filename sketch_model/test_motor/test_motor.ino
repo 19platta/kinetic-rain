@@ -12,7 +12,8 @@ const int numMotors = 1;
 Adafruit_DCMotor *motors [numMotors];
 Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 
-const byte numChars = numMotors * 4;
+const int numCharsPerMotor = 5;
+const byte numChars = numMotors * numCharsPerMotor;
 char receivedChars[numChars];
 boolean newData = false;
 
@@ -77,7 +78,12 @@ void parseNewData() {
     char * token = strtok(i == 0 ? receivedChars : NULL, ",");
     int motorSpeed = atoi(token);
     Serial.println(motorSpeed);
-    motors[i]->run(FORWARD);
+    if (motorSpeed > 0) {
+      motors[i]->run(FORWARD);
+    } else {
+      motors[i]->run(BACKWARD);
+      motorSpeed *= -1;
+    }
     motors[i]->setSpeed(motorSpeed);
     newData = false;
   }

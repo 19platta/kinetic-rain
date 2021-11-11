@@ -80,7 +80,7 @@ while True:
             cv2.putText(frame, label, (startX, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
 
-    frame = cv2.resize(frame, (1280, 960))   # show the output frame
+    frame = cv2.resize(frame, (1000, 800))   # show the output frame
     cv2.imshow("Frame", frame)
     key = cv2.waitKey(1) & 0xFF
     # if the `q` key was pressed, break from the loop
@@ -90,12 +90,11 @@ while True:
     fps.update()
 
     avg_x = (startX + endX) // 2; # 0 - 300
-    norm_x = avg_x / 300; # 0 - 1
-    motor_speed = norm_x * 255; # 0 - 255
-    motor_speed = min(max(int(motor_speed), 0), 255);
+    norm_x = avg_x / 300 - 0.5 # -0.5 - 0.5
+    motor_speed = norm_x * 150 * 2 # -255 - 255
+    motor_speed = min(max(int(motor_speed), -255), 255)
     speed_string = f"<{motor_speed}>"
     serialPort.write(bytes(speed_string, 'utf-8'))
-    # serialPort.write(bytes(str(100), 'utf-8'))
 
 # stop the timer and display FPS information
 fps.stop()
