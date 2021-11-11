@@ -35,21 +35,23 @@ char receivedChars[numChars];
 boolean newData = false;
 
 
-void setupMotors() {
+void setupAxles() {
   for (int i = 0; i < numMotors; i++) {
 		uint8_t pin = i + buttonOffset;
 		pinMode(pin, INPUT);
-    axles[i] = &{
-			.motor = &AFMS.getMotor(i + 1);
-			.lastSpeed = 0;
-			.angle = 0;
-			.button = &{
-				.pin = pin,
-				.lastDebounceTime = 0;
-				.lastReading = LOW;
-				.state = LOW;
-			}
-		}
+		Button button = {
+			.pin = pin,
+			.lastDebounceTime = 0,
+			.lastReading = LOW,
+			.state = LOW,
+		};
+		Axle axle = {
+			.motor = AFMS.getMotor(i + 1),
+			.lastSpeed = 0,
+			.angle = 0,
+			.button = &button,
+		};
+    axles[i] = &axle;
   }
 }
 
@@ -62,7 +64,7 @@ void setup() {
     while (1);
   }
 
-	setupMotors();
+	setupAxles();
 
   Serial.println("Setup Done");
 }
