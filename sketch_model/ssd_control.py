@@ -1,14 +1,28 @@
 # import the necessary packages
 from imutils.video import VideoStream
 from imutils.video import FPS
+from motor import Motor
 import numpy as np
 import argparse
 import imutils
 import time
 import cv2
+import calculations
 
 import serial
 from time import sleep
+
+FRAME_WIDTH = 300
+FRAME_HEIGHT = 300
+OFFSET = 0
+
+MOTOR_STALL_SPEED = 20
+MOTOR_MAX_SPEED = 200
+
+motor_array = [Motor(30), Motor(FRAME_WIDTH - 30)]
+motor_speeds = []
+
+prev_x = 0
 
 arduinoComPort = "/dev/ttyACM0"
 baudRate = 9600
@@ -50,10 +64,9 @@ while True:
     frame = imutils.resize(frame, width=400)
     # grab the frame dimensions and convert it to a blob
     (h, w) = frame.shape[:2]
-    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
-                                 0.007843, (300, 300), 127.5)
-    # pass the blob through the network and obtain the detections and
-    # predictions
+    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT)),
+                                 0.007843, (FRAME_WIDTH, FRAME_HEIGHT), 127.5)
+    # pass the blob through the network and obtain the detections and predictions
     net.setInput(blob)
     detections = net.forward()
 
@@ -89,13 +102,27 @@ while True:
     # update the FPS counter
     fps.update()
 
-    avg_x = (startX + endX) // 2; # 0 - 300
-    norm_x = avg_x / 300; # 0 - 1
-    motor_speed = norm_x * 255; # 0 - 255
-    motor_speed = min(max(int(motor_speed), 0), 255);
-    speed_string = f"<{motor_speed}>"
+    # calculate where the person is
+    avg_x = (startX + endX) / 2  # 0 - 300
+    norm_x = avg_x / FRAME_WIDTH  # 0 - 1
+
+    diff_x = norm_x - prev_x  # approximate velocity
+
+    for motor in motor_array:
+        norm_dist_from_motor = (avg_x - motor.x_position) / 300
+        angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, 18)
+        motor.speed = calculations.angle_to_motor_speed(
+            angle,
+            min_speed=MOTOR_STALL_SPEED,
+            max_speed=MOTOR_MAX_SPEED
+        )
+        motor_speeds.append(motor.speed)
+
+    speed_string = ",".join(motor_speeds)
     serialPort.write(bytes(speed_string, 'utf-8'))
     # serialPort.write(bytes(str(100), 'utf-8'))
+
+    prev_x = norm_x
 
 # stop the timer and display FPS information
 fps.stop()
