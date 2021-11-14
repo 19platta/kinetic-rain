@@ -13,6 +13,7 @@ typedef struct {
   unsigned long lastTime;
   float angle;
   int motorSpeed;
+  int motorDir;
 } Axle;
 
 
@@ -24,12 +25,12 @@ const uint8_t shieldPins[numShields] = {0x60};
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {1};
+const uint8_t numMotors[numShields] = {2};
 const uint8_t motorPins[numShields][4] = {{1, 3}};
 const uint8_t buttonPins[numShields][4] = {{0, 0}};
 
 // Should be `sum(numMotors)`
-const int numAxles = 1;
+const int numAxles = 2;
 Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 50;
@@ -69,6 +70,7 @@ void setup() {
           .lastTime = 0,
           .angle = 0,
           .motorSpeed = 0,
+          .motorDir = RELEASE,
       };
       axles[axleIdx++] = axle;
       // DO NOT TOUCH
@@ -125,6 +127,19 @@ void recvWithStartEndMarkers() {
 }
 
 
+void setMotor(Axle *axle, int motorSpeed, int dir) {
+  /* Sets motor speed and direction
+
+     Exists to ensure we never update the motor speed without also updating the
+     speed attribute of the axle.
+   */
+  axle->motorDir = dir;
+  axle->motorSpeed = motorSpeed;
+  axle->motor->run(dir);
+  axle->motor->setSpeed(motorSpeed);
+}
+
+
 float speed2angle(int motorSpeed) {
   /* Converts motor speed to angles per millisecond */
   float rpm = ((float)motorSpeed / 255.0) * 380.0; // Linear increase from 0 - 380 RPM
@@ -135,25 +150,14 @@ float speed2angle(int motorSpeed) {
 }
 
 
-void updateAxleAngle(Axle *axle) {
+void updateAngle(Axle *axle) {
   // The conversion from unsigned long (lastTime and millis()) to float
   // (axle->angle) is potentially a problem, but in practice shouldn't be since
   // the time between loops is small.
   unsigned long currentTime = millis();
-  axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(axle->motorSpeed);
+  int motorSpeed = axle->motorSpeed * (axle->motorDir == FORWARD ? 1 : -1);
+  axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(motorSpeed);
   axle->lastTime = currentTime;
-}
-
-void updateAngles() {
-  for (int i = 0; i < numAxles; i++){
-    updateAxleAngle(axles[i]);
-    if (
-        (axles[i]->angle < minAngle && axles[i]->motorSpeed < 0)||
-        (axles[i]->angle > maxAngle && axles[i]->motorSpeed > 0)
-       ) {
-      setMotor(axles[i], 0, RELEASE);
-    }
-  }
 }
 
 
@@ -174,41 +178,39 @@ void updateButton(Button *button) {
 }
 
 
-void setMotor(Axle *axle, int motorSpeed, int dir) {
-  /* Sets motor speed and direction
-
-     Exists to ensure we never update the motor speed without also updating the
-     speed attribute of the axle.
-   */
-  axle->motorSpeed = motorSpeed * (dir == FORWARD ? 1 : -1);
-  axle->motor->run(dir);
-  axle->motor->setSpeed(motorSpeed);
-}
-
-
-void parseNewData() {
+void updateAxles() {
   for (int i = 0; i < numAxles; i++) {
-    char * token = strtok(i == 0 ? receivedChars : NULL, ",>");
-    int motorSpeed = atoi(token);
-    int dir = FORWARD;
+    int motorSpeed = axles[i]->motorSpeed;
+    int dir = axles[i]->motorDir;
 
-    updateAxleAngle(axles[i]);
+    updateAngle(axles[i]);
     updateButton(axles[i]->button);
 
+    // Parse new data
+    if (newData) {
+      char *token = strtok(i == 0 ? receivedChars : NULL, ",>");
+      motorSpeed = atoi(token);
+      dir = FORWARD;
+      if (motorSpeed < 0) {
+        motorSpeed *= -1;
+        dir = BACKWARD;
+      }
+    }
+
+    // Stop conditions
     if (
         //axles[i]->button->state == HIGH ||
-        (axles[i]->angle < minAngle && motorSpeed < 0)||
-        (axles[i]->angle > maxAngle && motorSpeed > 0)
+        (axles[i]->angle <= minAngle && dir == BACKWARD)||
+        (axles[i]->angle >= maxAngle && dir == FORWARD)
        ) {
       motorSpeed = 0;
       dir = RELEASE;
     }
-    else if (motorSpeed < 0) {
-      motorSpeed *= -1;
-      dir = BACKWARD;
-    }
 
-    setMotor(axles[i], motorSpeed, dir);
+    // Update motor (only if something differs)
+    if (motorSpeed != axles[i]->motorSpeed || dir != axles[i]->motorDir) {
+      setMotor(axles[i], motorSpeed, dir);
+    }
   }
   newData = false;
 }
@@ -216,11 +218,5 @@ void parseNewData() {
 
 void loop() {
   recvWithStartEndMarkers();
-
-  if (newData) { 
-    parseNewData();
-  }
-  else {
-    updateAngles();
-  }
+  updateAxles();
 }
