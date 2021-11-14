@@ -11,8 +11,8 @@ typedef struct {
 	Adafruit_DCMotor *motor;
 	Button *button;
 	unsigned long lastTime;
-	long angle;
-	int speed;
+	float angle;
+	int motorSpeed;
 } Axle;
 
 
@@ -25,8 +25,8 @@ const uint8_t shieldPins[numShields] = {0x60};
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
 const uint8_t numMotors[numShields] = {1};
-const uint8_t motorPins[numShields][4] = {{1,}};
-const uint8_t buttonPins[numShields][4] = {{0,}};
+const uint8_t motorPins[numShields][4] = {{1}};
+const uint8_t buttonPins[numShields][4] = {{0}};
 
 // Should be `sum(numMotors)`
 const int numAxles = 1;
@@ -34,8 +34,9 @@ Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 50;
 
-const int minAngle = 0;
-const int maxAngle = 360 * 1000;
+const float maxRotations = 0.5;
+const float minAngle = 0.0;
+const float maxAngle = 360.0 * maxRotations;
 
 const int numCharsPerMotor = 5;
 const byte numChars = numAxles * numCharsPerMotor;
@@ -68,8 +69,9 @@ void setup() {
 				.button = &button,
 				.lastTime = 0,
 				.angle = 0,
-				.speed = 0,
+				.motorSpeed = 0,
 			};
+      delay(0);  // DONT TOUCH
 			axles[axleIdx++] = &axle;
 		}
 	}
@@ -108,7 +110,9 @@ void recvWithStartEndMarkers() {
 				}
 			}
 			else {
+        Serial.print("Test");
 				receivedChars[ndx] = '\0'; // terminate the string
+        Serial.print("Received chars: "); Serial.println(receivedChars);
 				recvInProgress = false;
 				ndx = 0;
 				newData = true;
@@ -121,21 +125,39 @@ void recvWithStartEndMarkers() {
 }
 
 
-long speed2angle(int speed) {
+float speed2angle(int motorSpeed) {
 	/* Converts motor speed to angles per millisecond */
-	int rpm = (((long)speed) / 255) * 200; // Linear increase from 0 - 200 RPM
-	int anglesPerMinute = rpm * 360;
-	int anglesPerSecond = anglesPerMinute / 60;
-	int anglesPerMilli = anglesPerSecond / 1000;
+	float rpm = ((float)motorSpeed / 255.0) * 380.0; // Linear increase from 0 - 380 RPM
+	float anglesPerMinute = rpm * 360.0;
+	float anglesPerSecond = (float)anglesPerMinute / 60.0;
+	float anglesPerMilli = (float)anglesPerSecond / 1000.0;
 	return anglesPerMilli;
 }
 
 
-void updateAngle(Axle *axle) {
-	// The conversion from unsigned long (lastTime and millis()) to signed long
+void updateAxleAngle(Axle *axle) {
+	// The conversion from unsigned long (lastTime and millis()) to float
 	// (axle->angle) is potentially a problem, but in practice shouldn't be since
 	// the time between loops is small.
-	axle->angle += ((long)(millis() - axle->lastTime)) * speed2angle(axle->speed);
+  unsigned long currentTime = millis();
+  Serial.print("Change: "); Serial.println(speed2angle(axle->motorSpeed));
+  Serial.print("Before: "); Serial.println(axle->angle);
+	axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(axle->motorSpeed);
+  Serial.print("After: "); Serial.println(axle->angle);
+  axle->lastTime = currentTime;
+  Serial.println();
+}
+
+void updateAngles() {
+  for (int i = 0; i < numAxles; i++){
+    updateAxleAngle(axles[i]);
+    if (
+      (axles[i]->angle < minAngle && axles[i]->motorSpeed < 0)||
+      (axles[i]->angle > maxAngle && axles[i]->motorSpeed > 0)
+    ) {
+      setMotor(axles[i], 0, RELEASE);
+    }
+  }
 }
 
 
@@ -156,41 +178,41 @@ void updateButton(Button *button) {
 }
 
 
-void setMotor(Axle *axle, int speed, int direction) {
+void setMotor(Axle *axle, int motorSpeed, int dir) {
 	/* Sets motor speed and direction
 
 		 Exists to ensure we never update the motor speed without also updating the
 		 speed attribute of the axle.
 	 */
-	axle->speed = speed * (direction == FORWARD ? 1 : -1);
-	axle->motor->run(direction);
-	axle->motor->setSpeed(speed);
+	axle->motorSpeed = motorSpeed * (dir == FORWARD ? 1 : -1);
+	axle->motor->run(dir);
+	axle->motor->setSpeed(motorSpeed);
 }
 
 
 void parseNewData() {
-	for (int i = 0; i < numAxles; i++){
+	for (int i = 0; i < numAxles; i++) {
 		char * token = strtok(i == 0 ? receivedChars : NULL, ",");
 		int motorSpeed = atoi(token);
-		int direction = FORWARD;
-
-		updateAngle(axles[i]);
+		int dir = FORWARD;
+    
+    updateAxleAngle(axles[i]);
 		updateButton(axles[i]->button);
 
 		if (
-			axles[i]->button->state == HIGH ||
-			axles[i]->angle < minAngle ||
-			axles[i]->angle > maxAngle
+			//axles[i]->button->state == HIGH ||
+			(axles[i]->angle < minAngle && motorSpeed < 0)||
+			(axles[i]->angle > maxAngle && motorSpeed > 0)
 		) {
 			motorSpeed = 0;
-			direction = RELEASE;
+			dir = RELEASE;
 		}
 		else if (motorSpeed < 0) {
 			motorSpeed *= -1;
-			direction = BACKWARD;
+			dir = BACKWARD;
 		}
 
-		setMotor(axles[i], motorSpeed, direction);
+		setMotor(axles[i], motorSpeed, dir);
 		newData = false;
 	}
 }
@@ -198,7 +220,12 @@ void parseNewData() {
 
 void loop() {
 	recvWithStartEndMarkers();
+  
 	if (newData) { 
 		parseNewData();
 	}
+	else {
+    updateAngles();
+	}
+  Serial.println(axles[0]->angle);
 }
