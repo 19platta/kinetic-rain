@@ -2,6 +2,7 @@
 from imutils.video import VideoStream
 from imutils.video import FPS
 from motor import Motor
+from sculpture import Sculpture
 import numpy as np
 import argparse
 import imutils
@@ -12,6 +13,8 @@ import calculations
 import serial
 from time import sleep
 
+sculpture = Sculpture(8, 18)
+
 FRAME_WIDTH = 300
 FRAME_HEIGHT = 300
 OFFSET = 0
@@ -19,14 +22,14 @@ OFFSET = 0
 MOTOR_STALL_SPEED = 20
 MOTOR_MAX_SPEED = 200
 
-motor_array = [Motor(30), Motor(FRAME_WIDTH - 30)]
+motor_array = sculpture.motors
 motor_speeds = []
 
 prev_x = 0
 
 arduinoComPort = "/dev/ttyACM0"
 baudRate = 9600
-serialPort = serial.Serial(arduinoComPort, baudRate, timeout=1)
+#serialPort = serial.Serial(arduinoComPort, baudRate, timeout=1)
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -55,6 +58,9 @@ print("[INFO] starting video stream...")
 vs = VideoStream(src=0).start()
 time.sleep(2.0)
 fps = FPS().start()
+
+startX = 0
+endX = 0
 
 # loop over the frames from the video stream
 while True:
@@ -110,16 +116,16 @@ while True:
 
     for motor in motor_array:
         norm_dist_from_motor = (avg_x - motor.x_position) / 300
-        angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, 18)
-        motor.speed = calculations.angle_to_motor_speed(
+        angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, sculpture.rise_speed)
+        motor.set_speed(calculations.angle_to_motor_speed(
             angle,
             min_speed=MOTOR_STALL_SPEED,
             max_speed=MOTOR_MAX_SPEED
+            )
         )
-        motor_speeds.append(motor.speed)
 
-    speed_string = ",".join(motor_speeds)
-    serialPort.write(bytes(speed_string, 'utf-8'))
+    speed_string = ",".join(sculpture.get_motor_speeds())
+    # serialPort.write(bytes(speed_string, 'utf-8'))
     # serialPort.write(bytes(str(100), 'utf-8'))
 
     prev_x = norm_x
