@@ -19,15 +19,16 @@ typedef struct {
 
 // Specify number of shields with numShields
 // Specify shield address with shieldPins
-const int numShields = 1;
-const uint8_t shieldPins[numShields] = {0x60};
+const int numShields = 2;
+const uint8_t shieldPins[numShields] = {0x61, 0x60};
+const Adafruit_MotorShield motorShields[numShields];
 
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {2};
-const uint8_t motorPins[numShields][4] = {{1, 3}};
-const uint8_t buttonPins[numShields][4] = {{0, 0}};
+const uint8_t numMotors[numShields] = {1, 1};
+const uint8_t motorPins[numShields][4] = {{2}, {1}};
+const uint8_t buttonPins[numShields][4] = {{0}, {0}};
 
 // Should be `sum(numMotors)`
 const int numAxles = 2;
@@ -50,8 +51,8 @@ void setup() {
 
   int axleIdx = 0;
   for (int i = 0; i < numShields; i++) {
-    Adafruit_MotorShield AFMS = Adafruit_MotorShield(shieldPins[i]);
-    if (!AFMS.begin()) {
+    motorShields[i] = Adafruit_MotorShield(shieldPins[i]);
+    if (!motorShields[i].begin()) {
       Serial.print("Could not find Motor Shield "); Serial.println(i);
       while (1);
     }
@@ -65,7 +66,7 @@ void setup() {
         .state = LOW,
       };
       Axle *axle = new Axle {
-        .motor = AFMS.getMotor(motorPins[i][j]),
+        .motor = motorShields[i].getMotor(motorPins[i][j]),
           .button = button,
           .lastTime = 0,
           .angle = 0,
@@ -183,8 +184,8 @@ void updateAxles() {
     int motorSpeed = axles[i]->motorSpeed;
     int dir = axles[i]->motorDir;
 
-    updateAngle(axles[i]);
     updateButton(axles[i]->button);
+    updateAngle(axles[i]);
 
     // Parse new data
     if (newData) {
