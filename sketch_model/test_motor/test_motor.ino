@@ -20,18 +20,18 @@ typedef struct {
 // Specify number of shields with numShields
 // Specify shield address with shieldPins
 const int numShields = 2;
-const uint8_t shieldPins[numShields] = {0x61, 0x60};
-const Adafruit_MotorShield motorShields[numShields];
+const uint8_t shieldPins[numShields] = {0x60};
+Adafruit_MotorShield motorShields[numShields];
 
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {1, 1};
-const uint8_t motorPins[numShields][4] = {{2}, {1}};
-const uint8_t buttonPins[numShields][4] = {{0}, {0}};
+const uint8_t numMotors[numShields] = {1};
+const uint8_t motorPins[numShields][4] = {{1}};
+const uint8_t buttonPins[numShields][4] = {{2}};
 
 // Should be `sum(numMotors)`
-const int numAxles = 2;
+const int numAxles = 1;
 Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 50;
@@ -58,7 +58,7 @@ void setup() {
     }
 
     for (int j = 0; j < numMotors[i]; j++) {
-      pinMode(buttonPins[i][j], INPUT);
+      pinMode(buttonPins[i][j], INPUT_PULLUP);
       Button *button = new Button {
         .pin = buttonPins[i][j],
         .lastDebounceTime = 0,
@@ -151,21 +151,6 @@ float speed2angle(int motorSpeed) {
 }
 
 
-void updateAngle(Axle *axle) {
-  // The conversion from unsigned long (lastTime and millis()) to float
-  // (axle->angle) is potentially a problem, but in practice shouldn't be since
-  // the time between loops is small.
-  unsigned long currentTime = millis();
-  if (axle->button->state == HIGH) {
-    axle->angle = minAngle;
-  } else {
-    int motorSpeed = axle->motorSpeed * (axle->motorDir == FORWARD ? 1 : -1);
-    axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(motorSpeed);
-  }
-  axle->lastTime = currentTime;
-}
-
-
 void updateButton(Button *button) {
   /* Debounces the button.
 
@@ -180,6 +165,22 @@ void updateButton(Button *button) {
     button->state = reading;
   }
   button->lastReading = reading;
+}
+
+
+void updateAngle(Axle *axle) {
+  // The conversion from unsigned long (lastTime and millis()) to float
+  // (axle->angle) is potentially a problem, but in practice shouldn't be since
+  // the time between loops is small.
+  unsigned long currentTime = millis();
+  if (axle->button->state == HIGH) {
+    axle->angle = minAngle;
+  } else {
+    int motorSpeed = axle->motorSpeed * (axle->motorDir == FORWARD ? 1 : -1);
+    axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(motorSpeed);
+  }
+  axle->lastTime = currentTime;
+  Serial.println(axle->button->state);
 }
 
 
@@ -204,7 +205,6 @@ void updateAxles() {
 
     // Stop conditions
     if (
-        //axles[i]->button->state == HIGH ||
         (axles[i]->angle <= minAngle && dir == BACKWARD)||
         (axles[i]->angle >= maxAngle && dir == FORWARD)
        ) {
