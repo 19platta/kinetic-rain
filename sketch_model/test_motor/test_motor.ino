@@ -156,8 +156,12 @@ void updateAngle(Axle *axle) {
   // (axle->angle) is potentially a problem, but in practice shouldn't be since
   // the time between loops is small.
   unsigned long currentTime = millis();
-  int motorSpeed = axle->motorSpeed * (axle->motorDir == FORWARD ? 1 : -1);
-  axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(motorSpeed);
+  if (axle->button->state == HIGH) {
+    axle->angle = minAngle;
+  } else {
+    int motorSpeed = axle->motorSpeed * (axle->motorDir == FORWARD ? 1 : -1);
+    axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(motorSpeed);
+  }
   axle->lastTime = currentTime;
 }
 
