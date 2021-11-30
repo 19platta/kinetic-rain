@@ -124,7 +124,7 @@ while True:
             )
         )
 
-    speed_string = ",".join(sculpture.get_motor_speeds())
+    speed_string = ",".join(sculpture.get_motor_speeds_as_str())
     # serialPort.write(bytes(speed_string, 'utf-8'))
     # serialPort.write(bytes(str(100), 'utf-8'))
 
