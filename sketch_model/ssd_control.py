@@ -117,6 +117,7 @@ while True:
     for motor in motor_array:
         norm_dist_from_motor = (avg_x - motor.x_position) / 300
         angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, sculpture.rise_speed)
+        motor.set_angle(angle)
         motor.set_speed(calculations.angle_to_motor_speed(
             angle,
             min_speed=MOTOR_STALL_SPEED,
@@ -124,7 +125,7 @@ while True:
             )
         )
 
-    speed_string = ",".join(sculpture.get_motor_speeds_as_str())
+    speed_string = ",".join(sculpture.get_speeds_and_angles_as_str())
     # serialPort.write(bytes(speed_string, 'utf-8'))
     # serialPort.write(bytes(str(100), 'utf-8'))
 

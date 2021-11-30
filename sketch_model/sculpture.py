@@ -8,4 +8,7 @@ class Sculpture:
         self.motors = [Motor() for _ in range(self.num_motors)]
 
     def get_motor_speeds_as_str(self):
-        return[str(motor.speed) for motor in self.motors]
+        return [str(motor.speed) for motor in self.motors]
+
+    def get_speeds_and_angles_as_str(self):
+        return [(str(motor.speed), str(motor.angle)) for motor in self.motors]
