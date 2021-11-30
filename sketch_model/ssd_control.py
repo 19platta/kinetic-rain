@@ -22,9 +22,6 @@ OFFSET = 0
 MOTOR_STALL_SPEED = 20
 MOTOR_MAX_SPEED = 200
 
-motor_array = sculpture.motors
-motor_speeds = []
-
 prev_x = 0
 
 arduinoComPort = "/dev/ttyACM0"
@@ -114,7 +111,7 @@ while True:
 
     diff_x = norm_x - prev_x  # approximate velocity
 
-    for motor in motor_array:
+    for motor in sculpture.motors:
         norm_dist_from_motor = (avg_x - motor.x_position) / 300
         angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, sculpture.rise_speed)
         motor.set_angle(angle)
