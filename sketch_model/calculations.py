@@ -10,7 +10,7 @@ def angle_to_motor_speed(angle, angle_domain=(-math.pi/2, math.pi/2), min_speed=
 
     ratio = angle / domain_size
     # use ratio to scale between 0 and 255
-    return int(min_speed + ratio * max_speed)
+    return int(min_speed + ratio * speed_range)
 
 
 def dist_arctan(avg_x, vel, rise_speed, forward_shift=0, flattening=150, sensitivity=0.75):
@@ -18,6 +18,9 @@ def dist_arctan(avg_x, vel, rise_speed, forward_shift=0, flattening=150, sensiti
         forward_shift *= -1
     distance = -abs(avg_x + forward_shift)
     distance = distance / flattening + sensitivity
-    return math.atan(distance) * rise_speed
+    distance = math.atan(distance)
+    distance += (math.pi / 8)
+    distance = distance / (3 * math.pi / 8) * 90
+    return distance * rise_speed
 
 
