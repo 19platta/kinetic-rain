@@ -19,25 +19,25 @@ typedef struct {
 
 // Specify number of shields with numShields
 // Specify shield address with shieldPins
-const int numShields = 2;
+const int numShields = 1;
 const uint8_t shieldPins[numShields] = {0x60};
 Adafruit_MotorShield motorShields[numShields];
 
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {1};
-const uint8_t motorPins[numShields][4] = {{1}};
-const uint8_t buttonPins[numShields][4] = {{2}};
+const uint8_t numMotors[numShields] = {3};
+const uint8_t motorPins[numShields][4] = {{1, 2, 3}};
+const uint8_t buttonPins[numShields][4] = {{1, 1, 1}};
 
 // Should be `sum(numMotors)`
-const int numAxles = 1;
+const int numAxles = 3;
 Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 50;
 
-const float maxRotations = 100;
-const float minAngle = 0.0;
+const float maxRotations = 1.0;
+const float minAngle = -1.0;
 const float maxAngle = 360.0 * maxRotations;
 
 const int numCharsPerAxle = 5;
@@ -180,7 +180,6 @@ void updateAngle(Axle *axle) {
     axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(motorSpeed);
   }
   axle->lastTime = currentTime;
-  Serial.println(axle->button->state);
 }
 
 
