@@ -13,8 +13,14 @@ typedef struct {
   unsigned long lastTime;
   float angle;
   int motorSpeed;
+  float angleSpeed;
   int motorDir;
 } Axle;
+
+typedef struct {
+  int motorSpeed;
+  float angleSpeed;
+} DataTuple;
 
 
 // Specify number of shields with numShields
@@ -26,12 +32,12 @@ Adafruit_MotorShield motorShields[numShields];
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {1};
-const uint8_t motorPins[numShields][4] = {{3}};
-const uint8_t buttonPins[numShields][4] = {{1}};
+const uint8_t numMotors[numShields] = {2};
+const uint8_t motorPins[numShields][4] = {{3, 1}};
+const uint8_t buttonPins[numShields][4] = {{1, 1}};
 
 // Should be `sum(numMotors)`
-const int numAxles = 1;
+const int numAxles = 2;
 Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 50;
@@ -40,7 +46,7 @@ const float maxRotations = 1.0;
 const float minAngle = -360.0;
 const float maxAngle = 360.0 * maxRotations;
 
-const int numCharsPerAxle = 5;
+const int numCharsPerAxle = 18;
 const byte numChars = numAxles * numCharsPerAxle + 2;
 char receivedChars[numChars];
 boolean newData = false;
@@ -67,11 +73,12 @@ void setup() {
       };
       Axle *axle = new Axle {
         .motor = motorShields[i].getMotor(motorPins[i][j]),
-          .button = button,
-          .lastTime = 0,
-          .angle = 0,
-          .motorSpeed = 0,
-          .motorDir = RELEASE,
+        .button = button,
+        .lastTime = 0,
+        .angle = 0,
+        .motorSpeed = 0,
+        .angleSpeed = 0.0,
+        .motorDir = RELEASE,
       };
       axles[axleIdx++] = axle;
       // DO NOT TOUCH
@@ -100,8 +107,8 @@ void recvWithStartEndMarkers() {
    */
   static boolean recvInProgress = false;
   static byte ndx = 0;
-  char startMarker = '<';
-  char endMarker = '>';
+  char startMarker = '[';
+  char endMarker = ']';
   char rc;
   while (Serial.available() > 0 && newData == false) {
     rc = Serial.read();
@@ -128,7 +135,7 @@ void recvWithStartEndMarkers() {
 }
 
 
-void setMotor(Axle *axle, int motorSpeed, int dir) {
+void setMotor(Axle *axle, int motorSpeed, float angleSpeed, int dir) {
   /* Sets motor speed and direction
 
      Exists to ensure we never update the motor speed without also updating the
@@ -136,18 +143,9 @@ void setMotor(Axle *axle, int motorSpeed, int dir) {
    */
   axle->motorDir = dir;
   axle->motorSpeed = motorSpeed;
+  axle->angleSpeed = angleSpeed;
   axle->motor->run(dir);
   axle->motor->setSpeed(motorSpeed);
-}
-
-
-float speed2angle(int motorSpeed) {
-  /* Converts motor speed to angles per millisecond */
-  float rpm = ((float)motorSpeed / 255.0) * 380.0; // Linear increase from 0 - 380 RPM
-  float anglesPerMinute = rpm * 360.0;
-  float anglesPerSecond = (float)anglesPerMinute / 60.0;
-  float anglesPerMilli = (float)anglesPerSecond / 1000.0;
-  return anglesPerMilli;
 }
 
 
@@ -176,16 +174,52 @@ void updateAngle(Axle *axle) {
   if (axle->button->state == HIGH) {
     axle->angle = minAngle;
   } else {
-    int motorSpeed = axle->motorSpeed * (axle->motorDir == FORWARD ? 1 : -1);
-    axle->angle += (float)(currentTime - axle->lastTime) * speed2angle(motorSpeed);
+    axle->angle += (float)(currentTime - axle->lastTime) * axle->angleSpeed / 1000.0;
   }
   axle->lastTime = currentTime;
 }
 
 
+DataTuple *parseTuple(char *tupleString) {
+  /* Parses a tuple passed over serial
+
+     Tuple is expectd to be of the form:
+     (3 char int, 10 char float)
+     where the int is the motor speed and the float is the angle speed
+   */
+  char *endChar;
+  char *token;
+
+  // Increment past leading characters
+  while (
+      *tupleString == '[' ||
+      *tupleString == '(' || 
+      *tupleString == ' ' ||
+      *tupleString == ','
+      ) {
+    tupleString++;   
+  }
+
+  // Parse motor speed (int)
+  token = strtok_r(tupleString, ",", &endChar);
+  int motorSpeed = atoi(token);
+
+  // Parse angular speed (float)
+  token = strtok_r(NULL, ",", &endChar);
+  float angleSpeed = atof(token);
+
+  return new DataTuple {
+    .motorSpeed = motorSpeed,
+    .angleSpeed = angleSpeed
+  };
+}
+
+
 void updateAxles() {
+  char *endTuple;
   for (int i = 0; i < numAxles; i++) {
     int motorSpeed = axles[i]->motorSpeed;
+    float angleSpeed = axles[i]->angleSpeed;
     int dir = axles[i]->motorDir;
 
     updateButton(axles[i]->button);
@@ -193,8 +227,14 @@ void updateAxles() {
 
     // Parse new data
     if (newData) {
-      char *token = strtok(i == 0 ? receivedChars : NULL, ",>");
-      motorSpeed = atoi(token);
+      // Parse tuple
+      char *tupleString = strtok_r(i == 0 ? receivedChars : NULL, ")", &endTuple);
+      DataTuple *tuple = parseTuple(tupleString);
+      motorSpeed = tuple->motorSpeed;
+      angleSpeed = tuple->angleSpeed;
+      delete tuple;
+
+      // Figure out direction
       dir = FORWARD;
       if (motorSpeed < 0) {
         motorSpeed *= -1;
@@ -208,12 +248,17 @@ void updateAxles() {
         (axles[i]->angle >= maxAngle && dir == FORWARD)
        ) {
       motorSpeed = 0;
+      angleSpeed = 0.0;
       dir = RELEASE;
     }
 
     // Update motor (only if something differs)
-    if (motorSpeed != axles[i]->motorSpeed || dir != axles[i]->motorDir) {
-      setMotor(axles[i], motorSpeed, dir);
+    if (
+        motorSpeed != axles[i]->motorSpeed ||
+        angleSpeed != axles[i]->angleSpeed ||
+        dir != axles[i]->motorDir
+       ) {
+      setMotor(axles[i], motorSpeed, angleSpeed, dir);
     }
   }
   newData = false;
