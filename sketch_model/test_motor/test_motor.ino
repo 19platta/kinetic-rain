@@ -26,18 +26,18 @@ Adafruit_MotorShield motorShields[numShields];
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {3};
-const uint8_t motorPins[numShields][4] = {{1, 2, 3}};
-const uint8_t buttonPins[numShields][4] = {{1, 1, 1}};
+const uint8_t numMotors[numShields] = {1};
+const uint8_t motorPins[numShields][4] = {{3}};
+const uint8_t buttonPins[numShields][4] = {{1}};
 
 // Should be `sum(numMotors)`
-const int numAxles = 3;
+const int numAxles = 1;
 Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 50;
 
 const float maxRotations = 1.0;
-const float minAngle = -1.0;
+const float minAngle = -360.0;
 const float maxAngle = 360.0 * maxRotations;
 
 const int numCharsPerAxle = 5;
