@@ -9,11 +9,17 @@ import imutils
 import time
 import cv2
 import calculations
+import joblib
 
 import serial
 from time import sleep
 
 sculpture = Sculpture(8, 18)
+
+motor_positions = joblib.load('motor_locations.jl')
+for i, motor in enumerate(sculpture.motors):
+    motor.set_position(motor_positions[i])
+    print(motor.x_position)
 
 FRAME_WIDTH = 300
 FRAME_HEIGHT = 300
@@ -24,9 +30,9 @@ MOTOR_MAX_SPEED = 200
 
 prev_x = 0
 
-arduinoComPort = "/dev/ttyACM0"
-baudRate = 9600
-serialPort = serial.Serial(arduinoComPort, baudRate, timeout=1)
+#arduinoComPort = "/dev/ttyACM0"
+#baudRate = 9600
+#serialPort = serial.Serial(arduinoComPort, baudRate, timeout=1)
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -123,7 +129,7 @@ while True:
         )
 
     speed_string = str(sculpture.get_speeds_and_angles())
-    serialPort.write(bytes(speed_string, 'utf-8'))
+    #serialPort.write(bytes(speed_string, 'utf-8'))
 
     prev_x = norm_x
 

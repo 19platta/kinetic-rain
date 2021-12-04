@@ -25,7 +25,6 @@ event = None
 def on_mouse(event,x,y,flags,params):
     # get mouse click
     if event == cv2.EVENT_LBUTTONDOWN:
-        print('clicked')
         motor_coords.append((x, y))
 
 
