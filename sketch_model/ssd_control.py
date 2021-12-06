@@ -14,12 +14,11 @@ import joblib
 import serial
 from time import sleep
 
-sculpture = Sculpture(8, 18)
+sculpture = Sculpture(8, 10)
 
 motor_positions = joblib.load('motor_locations.jl')
 for i, motor in enumerate(sculpture.motors):
     motor.set_position(motor_positions[i])
-    print(motor.x_position)
 
 FRAME_WIDTH = 300
 FRAME_HEIGHT = 300
@@ -58,7 +57,7 @@ net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
-vs = VideoStream(src=0).start()
+vs = VideoStream('/dev/video2').start()
 time.sleep(2.0)
 fps = FPS().start()
 
@@ -119,14 +118,19 @@ while True:
 
     for motor in sculpture.motors:
         norm_dist_from_motor = (avg_x - motor.x_position) / 300
-        angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, sculpture.rise_speed)
+        print(norm_dist_from_motor)
+        angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, sculpture.rise_speed, flattening=0.15, sensitivity=1)
         motor.set_angle(angle)
+
         motor.set_speed(calculations.angle_to_motor_speed(
             angle,
             min_speed=MOTOR_STALL_SPEED,
             max_speed=MOTOR_MAX_SPEED
             )
         )
+
+    print(sculpture.get_motor_speeds_as_str())
+    print([motor.angle for motor in sculpture.motors])
 
     speed_string = str(sculpture.get_speeds_and_angles())
     #serialPort.write(bytes(speed_string, 'utf-8'))

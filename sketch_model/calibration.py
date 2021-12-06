@@ -13,7 +13,7 @@ VIEWING_FRAME_WIDTH = 1280
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
-vs = VideoStream(src=0).start()
+vs = VideoStream('/dev/video2').start()
 time.sleep(2.0)
 fps = FPS().start()
 
