@@ -1,18 +1,37 @@
 # import the necessary packages
 from imutils.video import VideoStream
 from imutils.video import FPS
+from motor import Motor
+from sculpture import Sculpture
 import numpy as np
 import argparse
 import imutils
 import time
 import cv2
+import calculations
+import joblib
 
 import serial
 from time import sleep
 
-arduinoComPort = "/dev/ttyACM0"
-baudRate = 9600
-serialPort = serial.Serial(arduinoComPort, baudRate, timeout=1)
+sculpture = Sculpture(8, 10)
+
+motor_positions = joblib.load('motor_locations.jl')
+for i, motor in enumerate(sculpture.motors):
+    motor.set_position(motor_positions[i])
+
+FRAME_WIDTH = 300
+FRAME_HEIGHT = 300
+OFFSET = 0
+
+MOTOR_STALL_SPEED = 20
+MOTOR_MAX_SPEED = 200
+
+prev_x = 0
+
+#arduinoComPort = "/dev/ttyACM0"
+#baudRate = 9600
+#serialPort = serial.Serial(arduinoComPort, baudRate, timeout=1)
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -38,9 +57,12 @@ net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
-vs = VideoStream(src=0).start()
+vs = VideoStream('/dev/video2').start()
 time.sleep(2.0)
 fps = FPS().start()
+
+startX = 0
+endX = 0
 
 # loop over the frames from the video stream
 while True:
@@ -50,10 +72,9 @@ while True:
     frame = imutils.resize(frame, width=400)
     # grab the frame dimensions and convert it to a blob
     (h, w) = frame.shape[:2]
-    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
-                                 0.007843, (300, 300), 127.5)
-    # pass the blob through the network and obtain the detections and
-    # predictions
+    blob = cv2.dnn.blobFromImage(cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT)),
+                                 0.007843, (FRAME_WIDTH, FRAME_HEIGHT), 127.5)
+    # pass the blob through the network and obtain the detections and predictions
     net.setInput(blob)
     detections = net.forward()
 
@@ -88,13 +109,32 @@ while True:
         break
     # update the FPS counter
     fps.update()
+    # calculate where the person is
+    avg_x = (startX + endX) / 2  # 0 - 300
+    norm_x = avg_x / FRAME_WIDTH  # 0 - 1
 
-    avg_x = (startX + endX) // 2; # 0 - 300
-    norm_x = avg_x / 300 - 0.5 # -0.5 - 0.5
-    motor_speed = norm_x * 150 * 2 # -255 - 255
-    motor_speed = min(max(int(motor_speed), -255), 255)
-    speed_string = f"<{motor_speed}>"
-    serialPort.write(bytes(speed_string, 'utf-8'))
+    diff_x = norm_x - prev_x  # approximate velocity
+
+    for motor in sculpture.motors:
+        norm_dist_from_motor = (avg_x - motor.x_position) / 300
+        print(norm_dist_from_motor)
+        angle = calculations.dist_arctan(norm_dist_from_motor, diff_x, sculpture.rise_speed, flattening=0.15, sensitivity=1)
+        motor.set_angle(angle)
+
+        motor.set_speed(calculations.angle_to_motor_speed(
+            angle,
+            min_speed=MOTOR_STALL_SPEED,
+            max_speed=MOTOR_MAX_SPEED
+            )
+        )
+
+    print(sculpture.get_motor_speeds_as_str())
+    print([motor.angle for motor in sculpture.motors])
+
+    speed_string = str(sculpture.get_speeds_and_angles())
+    #serialPort.write(bytes(speed_string, 'utf-8'))
+
+    prev_x = norm_x
 
 # stop the timer and display FPS information
 fps.stop()
