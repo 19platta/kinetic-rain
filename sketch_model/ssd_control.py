@@ -101,7 +101,7 @@ while True:
             cv2.putText(frame, label, (startX, y),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
 
-    frame = cv2.resize(frame, (1280, 960))   # show the output frame
+    frame = cv2.resize(frame, (1000, 800))   # show the output frame
     cv2.imshow("Frame", frame)
     key = cv2.waitKey(1) & 0xFF
     # if the `q` key was pressed, break from the loop
@@ -109,7 +109,6 @@ while True:
         break
     # update the FPS counter
     fps.update()
-
     # calculate where the person is
     avg_x = (startX + endX) / 2  # 0 - 300
     norm_x = avg_x / FRAME_WIDTH  # 0 - 1
