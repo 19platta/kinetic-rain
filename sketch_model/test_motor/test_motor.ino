@@ -5,6 +5,7 @@ typedef struct {
   unsigned long lastDebounceTime;
   int lastReading;
   int state;
+  bool changed;
 } Button;
 
 typedef struct {
@@ -15,6 +16,7 @@ typedef struct {
   int motorSpeed;
   float angleSpeed;
   int motorDir;
+  int lastEncoderDir;
 } Axle;
 
 typedef struct {
@@ -45,6 +47,7 @@ const unsigned long debounceDelay = 50;
 const float maxRotations = 1.0;
 const float minAngle = -360.0;
 const float maxAngle = 360.0 * maxRotations;
+const float encoderAngle = 90.0;
 
 const int numCharsPerAxle = 18;
 const byte numChars = numAxles * numCharsPerAxle + 2;
@@ -70,6 +73,7 @@ void setup() {
         .lastDebounceTime = 0,
         .lastReading = LOW,
         .state = LOW,
+        .changed = false,
       };
       Axle *axle = new Axle {
         .motor = motorShields[i].getMotor(motorPins[i][j]),
@@ -79,6 +83,7 @@ void setup() {
         .motorSpeed = 0,
         .angleSpeed = 0.0,
         .motorDir = RELEASE,
+        .lastEncoderDir = RELEASE,
       };
       axles[axleIdx++] = axle;
       // DO NOT TOUCH
@@ -161,22 +166,22 @@ void updateButton(Button *button) {
   }
   if ((millis() - button->lastDebounceTime) > debounceDelay) {
     button->state = reading;
+    button->changed = true;
+  }
+  else {
+    button->changed = false;
   }
   button->lastReading = reading;
 }
 
 
 void updateAngle(Axle *axle) {
-  // The conversion from unsigned long (lastTime and millis()) to float
-  // (axle->angle) is potentially a problem, but in practice shouldn't be since
-  // the time between loops is small.
-  unsigned long currentTime = millis();
-  if (axle->button->state == HIGH) {
-    axle->angle = minAngle;
-  } else {
-    axle->angle += (float)(currentTime - axle->lastTime) * axle->angleSpeed / 1000.0;
+  if (axle->button->state == HIGH && axle->button->changed) {
+    if (axle->lastEncoderDir == axle->motorDir || axle->lastEncoderDir == RELEASE) {
+      axle->angle += encoderAngle * (axle->motorDir == FORWARD ? 1 : -1);
+    }
+    axle->lastEncoderDir = axle->motorDir;
   }
-  axle->lastTime = currentTime;
 }
 
 
