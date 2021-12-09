@@ -21,6 +21,10 @@ OFFSET = 0
 MOTOR_STALL_SPEED = 20
 MOTOR_MAX_SPEED = 200
 
+MARGIN = 5
+
+RESET_ANGLE = -30
+
 # initialize the list of class labels MobileNet SSD was trained to
 # detect, then generate a set of bounding box colors for each class
 CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
@@ -84,10 +88,10 @@ def detection_generator(net, vs):
         # grab the frame from the threaded video stream and resize it
         # to have a maximum width of 400 pixels
         frame = vs.read()
-        frame = imutils.resize(frame, width=400)
+        frame = imutils.resize(frame, width=FRAME_WIDTH, height=FRAME_HEIGHT)
         # grab the frame dimensions and convert it to a blob
         blob = cv2.dnn.blobFromImage(
-            cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT)),
+            frame,
             0.007843, (FRAME_WIDTH, FRAME_HEIGHT), 127.5
         )
         # pass the blob through the network and obtain the detections and predictions
@@ -128,12 +132,31 @@ def draw_box_to_frame(frame, coords, confidence):
     cv2.imshow("Frame", frame)
 
 
-def set_speeds(sculpture, serial_port, coords, prev_x):
+def set_return_speed(sculpture):
+    for motor in sculpture.motors:
+        angle = RESET_ANGLE * sculpture.rise_speed
+        motor.set_angle(angle)
+        motor.set_speed(calculations.angle_to_motor_speed(
+            angle,
+            min_speed=MOTOR_STALL_SPEED,
+            max_speed=MOTOR_MAX_SPEED
+        ))
+
+
+def set_speeds(sculpture, serial_port, coords, prev_x, prev_coords):
+    if coords is None:
+        startX, _, endX, _ = prev_coords
+        if prev_x is None or (startX <= MARGIN or endX >= FRAME_WIDTH - MARGIN):
+            set_return_speed(sculpture)
+            return None
+        else:
+            coords = prev_coords
+
     # Calculate where the person is
     startX, _, endX, _ = coords
     avg_x = (startX + endX) / 2  # 0 - 300
     norm_x = avg_x / FRAME_WIDTH  # 0 - 1
-    diff_x = norm_x - prev_x  # approximate velocity
+    diff_x = norm_x if prev_x is None else norm_x - prev_x  # approximate velocity
 
     # Update motor speeds
     for motor in sculpture.motors:
@@ -166,7 +189,8 @@ def main():
     serial_port = None
     # serial_port = init_serial()
 
-    prev_x = 0
+    prev_x = None
+    prev_coords = (0, 0, 0, 0)
     frame = None
     try:
         for (frame, detections) in detection_generator(net, vs):
@@ -176,8 +200,8 @@ def main():
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord("q"):
                     raise KeyboardInterrupt  # This is a little jank...
-            if coords is not None:
-                prev_x = set_speeds(sculpture, serial_port, coords, prev_x)
+            prev_x = set_speeds(sculpture, serial_port, coords, prev_x, prev_coords)
+            prev_coords = coords if coords is not None else prev_coords
             fps.update()
     except KeyboardInterrupt:
         fps.stop()
