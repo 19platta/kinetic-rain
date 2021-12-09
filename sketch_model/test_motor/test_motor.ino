@@ -34,12 +34,12 @@ Adafruit_MotorShield motorShields[numShields];
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {2};
-const uint8_t motorPins[numShields][4] = {{3, 1}};
-const uint8_t buttonPins[numShields][4] = {{1, 1}};
+const uint8_t numMotors[numShields] = {1};
+const uint8_t motorPins[numShields][4] = {{1}};
+const uint8_t buttonPins[numShields][4] = {{2}};
 
 // Should be `sum(numMotors)`
-const int numAxles = 2;
+const int numAxles = 1;
 Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 50;
@@ -164,7 +164,7 @@ void updateButton(Button *button) {
   if (reading != button->lastReading) {
     button->lastDebounceTime = millis();
   }
-  if ((millis() - button->lastDebounceTime) > debounceDelay) {
+  if ((millis() - button->lastDebounceTime) > debounceDelay && button->state != reading) {
     button->state = reading;
     button->changed = true;
   }
@@ -177,8 +177,12 @@ void updateButton(Button *button) {
 
 void updateAngle(Axle *axle) {
   if (axle->button->state == HIGH && axle->button->changed) {
-    if (axle->lastEncoderDir == axle->motorDir || axle->lastEncoderDir == RELEASE) {
+    if (
+      (axle->lastEncoderDir == axle->motorDir || axle->lastEncoderDir == RELEASE) &&
+      (axle->motorDir != RELEASE)
+    ){
       axle->angle += encoderAngle * (axle->motorDir == FORWARD ? 1 : -1);
+      Serial.println(axle->angle);
     }
     axle->lastEncoderDir = axle->motorDir;
   }
