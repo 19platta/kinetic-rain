@@ -1,4 +1,4 @@
- #include <Adafruit_MotorShield.h>
+#include <Adafruit_MotorShield.h>
 
 typedef struct {
   uint8_t pin;
@@ -81,8 +81,9 @@ void setup() {
         .angle = 0,
         .motorSpeed = 0,
         .angleSpeed = 0.0,
-        .motorDir = RELEASE,
+        .motorDir = BACKWARD,
       };
+      setMotor(axle, 0, 0.0, BACKWARD);
       axles[axleIdx++] = axle;
       // DO NOT TOUCH
       // Running with one motor breaks without this line
@@ -175,8 +176,7 @@ void updateButton(Button *button) {
 
 void updateAngle(Axle *axle) {
   if (axle->button->state == HIGH && axle->button->changed) {
-    int angleDir = axle->motorDir == BACKWARD || axle->motorSpeed == 0 ? -1 : 1;
-    axle->angle += encoderAngle * angleDir;
+    axle->angle += encoderAngle * (axle->motorDir == BACKWARD ? -1 : 1);
     Serial.println(axle->angle);
     Serial.println(axle->motorSpeed);
   }
@@ -252,7 +252,7 @@ void updateAxles() {
        ) {
       motorSpeed = 0;
       angleSpeed = 0.0;
-      // dir = RELEASE;
+      dir = dir == FORWARD ? BACKWARD : FORWARD;
     }
 
     // Update motor (only if something differs)
