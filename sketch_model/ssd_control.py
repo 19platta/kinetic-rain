@@ -18,12 +18,14 @@ FRAME_WIDTH = 300
 FRAME_HEIGHT = 300
 OFFSET = 0
 
-MOTOR_STALL_SPEED = 20
-MOTOR_MAX_SPEED = 200
+POS_MOTOR_STALL_SPEED = 80
+POS_MOTOR_MAX_SPEED = 150
+NEG_MOTOR_STALL_SPEED = -20
+NEG_MOTOR_MAX_SPEED = -50
 
 MARGIN = 5
 
-RESET_ANGLE = -30
+RESET_ANGLE = 0
 
 # initialize the list of class labels MobileNet SSD was trained to
 # detect, then generate a set of bounding box colors for each class
@@ -61,7 +63,7 @@ def init_sculpture(args):
     return sculpture
 
 
-def init_serial(com_port="dev/ttyACM0", baud_rate=9600):
+def init_serial(com_port="/dev/ttyACM0", baud_rate=9600):
     serial_port = serial.Serial(com_port, baud_rate, timeout=1)
     return serial_port
 
@@ -138,8 +140,10 @@ def set_return_speed(sculpture):
         motor.set_angle(angle)
         motor.set_speed(calculations.angle_to_motor_speed(
             angle,
-            min_speed=MOTOR_STALL_SPEED,
-            max_speed=MOTOR_MAX_SPEED
+            pos_min_speed=POS_MOTOR_STALL_SPEED,
+            pos_max_speed=POS_MOTOR_MAX_SPEED,
+            neg_min_speed=NEG_MOTOR_STALL_SPEED,
+            neg_max_speed=NEG_MOTOR_MAX_SPEED,
         ))
 
 
@@ -157,6 +161,7 @@ def set_speeds(sculpture, serial_port, coords, prev_x, prev_coords):
     avg_x = (startX + endX) / 2  # 0 - 300
     norm_x = avg_x / FRAME_WIDTH  # 0 - 1
     diff_x = norm_x if prev_x is None else norm_x - prev_x  # approximate velocity
+    print(f"NORM: {norm_x}")
 
     # Update motor speeds
     for motor in sculpture.motors:
@@ -168,15 +173,20 @@ def set_speeds(sculpture, serial_port, coords, prev_x, prev_coords):
         motor.set_angle(angle)
         motor.set_speed(calculations.angle_to_motor_speed(
             angle,
-            min_speed=MOTOR_STALL_SPEED,
-            max_speed=MOTOR_MAX_SPEED
+            pos_min_speed=POS_MOTOR_STALL_SPEED,
+            pos_max_speed=POS_MOTOR_MAX_SPEED,
+            neg_min_speed=NEG_MOTOR_STALL_SPEED,
+            neg_max_speed=NEG_MOTOR_MAX_SPEED,
         ))
 
     # print(sculpture.get_motor_speeds_as_str())
     # print([motor.angle for motor in sculpture.motors])
 
-    # speed_string = str(sculpture.get_speeds_and_angles())
-    # serial_port.write(bytes(speed_string, 'utf-8'))
+    speed_string = str(sculpture.get_speeds_and_angles())
+    print(f"DIST: {norm_dist_from_motor}")
+    print(f"SPEED: {sculpture.get_speeds_and_angles()[0]}")
+    print()
+    serial_port.write(bytes(speed_string, 'utf-8'))
 
     return norm_x
 
@@ -186,8 +196,8 @@ def main():
     sculpture = init_sculpture(args)
     net = init_net(args)
     vs, fps = init_video(args)
-    serial_port = None
-    # serial_port = init_serial()
+    # serial_port = None
+    serial_port = init_serial()
 
     prev_x = None
     prev_coords = (0, 0, 0, 0)
