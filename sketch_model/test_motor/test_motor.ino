@@ -1,4 +1,4 @@
-#include <Adafruit_MotorShield.h>
+ #include <Adafruit_MotorShield.h>
 
 typedef struct {
   uint8_t pin;
@@ -16,7 +16,6 @@ typedef struct {
   int motorSpeed;
   float angleSpeed;
   int motorDir;
-  int lastEncoderDir;
 } Axle;
 
 typedef struct {
@@ -35,17 +34,17 @@ Adafruit_MotorShield motorShields[numShields];
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
 const uint8_t numMotors[numShields] = {1};
-const uint8_t motorPins[numShields][4] = {{1}};
+const uint8_t motorPins[numShields][4] = {{4}};
 const uint8_t buttonPins[numShields][4] = {{2}};
 
 // Should be `sum(numMotors)`
 const int numAxles = 1;
 Axle *axles[numAxles];
 
-const unsigned long debounceDelay = 50;
+const unsigned long debounceDelay = 5;
 
-const float maxRotations = 1.0;
-const float minAngle = -360.0;
+const float maxRotations = 2.0;
+const float minAngle = 0.0;
 const float maxAngle = 360.0 * maxRotations;
 const float encoderAngle = 90.0;
 
@@ -83,7 +82,6 @@ void setup() {
         .motorSpeed = 0,
         .angleSpeed = 0.0,
         .motorDir = RELEASE,
-        .lastEncoderDir = RELEASE,
       };
       axles[axleIdx++] = axle;
       // DO NOT TOUCH
@@ -177,14 +175,10 @@ void updateButton(Button *button) {
 
 void updateAngle(Axle *axle) {
   if (axle->button->state == HIGH && axle->button->changed) {
-    if (
-      (axle->lastEncoderDir == axle->motorDir || axle->lastEncoderDir == RELEASE) &&
-      (axle->motorDir != RELEASE)
-    ){
-      axle->angle += encoderAngle * (axle->motorDir == FORWARD ? 1 : -1);
-      Serial.println(axle->angle);
-    }
-    axle->lastEncoderDir = axle->motorDir;
+    int angleDir = axle->motorDir == BACKWARD || axle->motorSpeed == 0 ? -1 : 1;
+    axle->angle += encoderAngle * angleDir;
+    Serial.println(axle->angle);
+    Serial.println(axle->motorSpeed);
   }
 }
 
@@ -258,7 +252,7 @@ void updateAxles() {
        ) {
       motorSpeed = 0;
       angleSpeed = 0.0;
-      dir = RELEASE;
+      // dir = RELEASE;
     }
 
     // Update motor (only if something differs)
