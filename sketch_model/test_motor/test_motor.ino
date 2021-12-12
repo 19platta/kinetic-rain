@@ -11,11 +11,11 @@ typedef struct {
 typedef struct {
   Adafruit_DCMotor *motor;
   Button *button;
-  unsigned long lastTime;
   float angle;
   int motorSpeed;
   float angleSpeed;
   int motorDir;
+  int highDir;
 } Axle;
 
 typedef struct {
@@ -77,11 +77,11 @@ void setup() {
       Axle *axle = new Axle {
         .motor = motorShields[i].getMotor(motorPins[i][j]),
         .button = button,
-        .lastTime = 0,
         .angle = 0,
         .motorSpeed = 0,
         .angleSpeed = 0.0,
         .motorDir = BACKWARD,
+        .highDir = BACKWARD,
       };
       setMotor(axle, 0, 0.0, BACKWARD);
       axles[axleIdx++] = axle;
@@ -160,10 +160,11 @@ void updateButton(Button *button) {
      at least debounceDelay milliseconds.
    */
   int reading = digitalRead(button->pin);
+  unsigned long time = millis();
   if (reading != button->lastReading) {
-    button->lastDebounceTime = millis();
+    button->lastDebounceTime = time;
   }
-  if ((millis() - button->lastDebounceTime) > debounceDelay && button->state != reading) {
+  if ((time - button->lastDebounceTime) > debounceDelay && button->state != reading) {
     button->state = reading;
     button->changed = true;
   }
@@ -175,11 +176,19 @@ void updateButton(Button *button) {
 
 
 void updateAngle(Axle *axle) {
-  if (axle->button->state == HIGH && axle->button->changed) {
-    axle->angle += encoderAngle * (axle->motorDir == BACKWARD ? -1 : 1);
-    Serial.println(axle->angle);
-    Serial.println(axle->motorSpeed);
+  if (!axle->button->changed)
+    return;
+
+  if (axle->button->state == HIGH) {
+    axle->angle += encoderAngle * (axle->motorDir == FORWARD ? 1 : -1);
+    axle->highDir = axle->motorDir;
   }
+  else if (axle->button->state == LOW && axle->motorDir != axle->highDir) {
+    axle->angle += encoderAngle * (axle->motorDir == FORWARD ? 1 : -1);
+  }
+
+  Serial.println(axle->angle);
+  Serial.println(axle->motorSpeed);
 }
 
 
