@@ -16,6 +16,7 @@ typedef struct {
   float angleSpeed;
   int motorDir;
   int highDir;
+  float calibrationConst;
 } Axle;
 
 typedef struct {
@@ -26,24 +27,28 @@ typedef struct {
 
 // Specify number of shields with numShields
 // Specify shield address with shieldPins
-const int numShields = 1;
-const uint8_t shieldPins[numShields] = {0x60};
+
+const int numShields = 2;
+const uint8_t shieldPins[numShields] = {0x61, 0x60};
 Adafruit_MotorShield motorShields[numShields];
 
 // Specify number of motors on each shield with numMotors
 // Specify motor pin and button pins with motorPins and buttonPins
 // motorPins[i] length and buttonPins[i] lengt should equal numMotors[i]
-const uint8_t numMotors[numShields] = {1};
-const uint8_t motorPins[numShields][4] = {{4}};
-const uint8_t buttonPins[numShields][4] = {{2}};
+
+const uint8_t numMotors[numShields] = {4, 4};
+const uint8_t motorPins[numShields][4] = {{1, 2, 3, 4}, {1, 2, 3, 4}};
+const uint8_t buttonPins[numShields][4] = {{2, 3, 4, 5}, {6, 7, 8, 9}};
+const float calibrationConsts[numShields][4] = {{1.0, 1.1, 1.0, 1.0}, {1.1, 1.0, 1.1, 1.1}};
+
 
 // Should be `sum(numMotors)`
-const int numAxles = 1;
+const int numAxles = 8;
 Axle *axles[numAxles];
 
 const unsigned long debounceDelay = 5;
 
-const float maxRotations = 2.0;
+const float maxRotations = 3.0;
 const float minAngle = 0.0;
 const float maxAngle = 360.0 * maxRotations;
 const float encoderAngle = 90.0;
@@ -55,7 +60,7 @@ boolean newData = false;
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   int axleIdx = 0;
   for (int i = 0; i < numShields; i++) {
@@ -70,8 +75,8 @@ void setup() {
       Button *button = new Button {
         .pin = buttonPins[i][j],
         .lastDebounceTime = 0,
-        .lastReading = LOW,
-        .state = LOW,
+        .lastReading = HIGH,
+        .state = HIGH,
         .changed = false,
       };
       Axle *axle = new Axle {
@@ -82,8 +87,14 @@ void setup() {
         .angleSpeed = 0.0,
         .motorDir = BACKWARD,
         .highDir = BACKWARD,
+        .calibrationConst = calibrationConsts[i][j],
       };
+      
       setMotor(axle, 0, 0.0, BACKWARD);
+      updateButton(button);
+      delay(debounceDelay * 2);
+      updateButton(button);
+      
       axles[axleIdx++] = axle;
       // DO NOT TOUCH
       // Running with one motor breaks without this line
@@ -145,11 +156,14 @@ void setMotor(Axle *axle, int motorSpeed, float angleSpeed, int dir) {
      Exists to ensure we never update the motor speed without also updating the
      speed attribute of the axle.
    */
+  float adjustedSpeed = (float)motorSpeed * axle->calibrationConst;
+  int finalSpeed = min((int)adjustedSpeed, 255);
+  
   axle->motorDir = dir;
   axle->motorSpeed = motorSpeed;
   axle->angleSpeed = angleSpeed;
   axle->motor->run(dir);
-  axle->motor->setSpeed(motorSpeed);
+  axle->motor->setSpeed(finalSpeed);
 }
 
 
@@ -256,12 +270,17 @@ void updateAxles() {
 
     // Stop conditions
     if (
-        (axles[i]->angle <= minAngle && dir == BACKWARD)||
-        (axles[i]->angle >= maxAngle && dir == FORWARD)
+        (
+          (axles[i]->angle <= minAngle && dir == BACKWARD)||
+          ((axles[i]->angle >= maxAngle && dir == FORWARD) && (axles[i]->button->state == LOW))
+        )
        ) {
-      motorSpeed = 0;
+      if (axles[i]->angle >= maxAngle && dir == FORWARD)
+        motorSpeed = 50;
+      else
+        motorSpeed = 0;
       angleSpeed = 0.0;
-      dir = dir == FORWARD ? BACKWARD : FORWARD;
+      dir = BACKWARD;
     }
 
     // Update motor (only if something differs)

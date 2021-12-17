@@ -18,14 +18,14 @@ FRAME_WIDTH = 300
 FRAME_HEIGHT = 300
 OFFSET = 0
 
-POS_MOTOR_STALL_SPEED = 80
-POS_MOTOR_MAX_SPEED = 150
-NEG_MOTOR_STALL_SPEED = -20
-NEG_MOTOR_MAX_SPEED = -50
+POS_MOTOR_STALL_SPEED = 150
+POS_MOTOR_MAX_SPEED = 180
+NEG_MOTOR_STALL_SPEED = -50
+NEG_MOTOR_MAX_SPEED = -80
 
 MARGIN = 5
 
-RESET_ANGLE = 0
+RESET_SPEED = -50
 
 # initialize the list of class labels MobileNet SSD was trained to
 # detect, then generate a set of bounding box colors for each class
@@ -58,12 +58,13 @@ def parse_args():
 def init_sculpture(args):
     sculpture = Sculpture(8, 10)
     motor_positions = joblib.load(args["motor_locations"])
+    print(motor_positions)
     for i, motor in enumerate(sculpture.motors):
         motor.set_position(motor_positions[i])
     return sculpture
 
 
-def init_serial(com_port="/dev/ttyACM0", baud_rate=9600):
+def init_serial(com_port="/dev/ttyACM0", baud_rate=115200):
     serial_port = serial.Serial(com_port, baud_rate, timeout=1)
     return serial_port
 
@@ -136,15 +137,7 @@ def draw_box_to_frame(frame, coords, confidence):
 
 def set_return_speed(sculpture):
     for motor in sculpture.motors:
-        angle = RESET_ANGLE * sculpture.rise_speed
-        motor.set_angle(angle)
-        motor.set_speed(calculations.angle_to_motor_speed(
-            angle,
-            pos_min_speed=POS_MOTOR_STALL_SPEED,
-            pos_max_speed=POS_MOTOR_MAX_SPEED,
-            neg_min_speed=NEG_MOTOR_STALL_SPEED,
-            neg_max_speed=NEG_MOTOR_MAX_SPEED,
-        ))
+        motor.set_speed(RESET_SPEED)
 
 
 def set_speeds(sculpture, serial_port, coords, prev_x, prev_coords):
@@ -168,7 +161,7 @@ def set_speeds(sculpture, serial_port, coords, prev_x, prev_coords):
         norm_dist_from_motor = (avg_x - motor.x_position) / 300
         angle = calculations.dist_arctan(
             norm_dist_from_motor, diff_x, sculpture.rise_speed,
-            flattening=0.15, sensitivity=1
+            forward_shift=-0.1, flattening=0.15, sensitivity=1
         )
         motor.set_angle(angle)
         motor.set_speed(calculations.angle_to_motor_speed(
@@ -183,9 +176,10 @@ def set_speeds(sculpture, serial_port, coords, prev_x, prev_coords):
     # print([motor.angle for motor in sculpture.motors])
 
     speed_string = str(sculpture.get_speeds_and_angles())
-    print(f"DIST: {norm_dist_from_motor}")
-    print(f"SPEED: {sculpture.get_speeds_and_angles()[0]}")
-    print()
+    # print(f"DIST: {norm_dist_from_motor}")
+    # print(f"SPEED: {sculpture.get_speeds_and_angles()[0]}")
+    # print()
+    print(speed_string)
     serial_port.write(bytes(speed_string, 'utf-8'))
 
     return norm_x

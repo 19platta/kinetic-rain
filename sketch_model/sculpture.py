@@ -11,4 +11,4 @@ class Sculpture:
         return [str(motor.speed) for motor in self.motors]
 
     def get_speeds_and_angles(self):
-        return [(motor.speed, motor.angle) for motor in self.motors]
+        return [(motor.speed, 0) for motor in self.motors]
